@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🔍 Verification & Debug Client</title>
+  <style>
+    body { font-family: monospace; background: #0d1117; color: #c9d1d9; padding: 20px; display: flex; gap: 20px; }
+    h2 { margin-top: 0; color: #58a6ff; }
+    
+    /* Layout */
+    .left-panel { flex: 1; }
+    .right-panel { flex: 1; border-left: 1px solid #30363d; padding-left: 20px; }
+
+    /* Controls */
+    .controls { background: #161b22; padding: 15px; border: 1px solid #30363d; margin-bottom: 20px; }
+    button { background: #21262d; color: #fff; border: 1px solid #30363d; padding: 5px 10px; cursor: pointer; margin: 5px; }
+    button:hover { background: #30363d; }
+    
+    /* List */
+    .token-item { padding: 8px; border-bottom: 1px solid #21262d; cursor: pointer; }
+    .token-item:hover { background: #1f6feb; color: #fff; }
+    
+    /* Raw Data Inspector */
+    #inspector { white-space: pre-wrap; background: #000; color: #0f0; padding: 10px; border: 1px solid #333; height: 400px; overflow-y: auto; }
+    .metric { color: #8b949e; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+
+  <div class="left-panel">
+    <h2>1. Visual Verification</h2>
+    <div class="controls">
+      <strong>Filters & Sorts:</strong><br>
+      <button onclick="sortPriceDesc()">⬇ Sort Price (High->Low)</button>
+      <button onclick="sortPriceAsc()">⬆ Sort Price (Low->High)</button>
+      <button onclick="filterTop5()"> Filter Top 5</button>
+      <button onclick="resetView()"> Reset</button>
+      <br><br>
+      <div class="metric">
+        Items in Memory: <span id="total-count">0</span> | 
+        Displayed: <span id="display-count">0</span>
+      </div>
+    </div>
+
+    <div id="list-container">Waiting for data...</div>
+  </div>
+
+  <div class="right-panel">
+    <h2>2. Data Accuracy Check</h2>
+    <p class="metric">Click any item on the left to inspect its RAW JSON data below.</p>
+    <div id="inspector">Select a token to see raw data...</div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script>
+    const socket = io("http://localhost:3000");
+    
+    let masterData = []; 
+    let displayedData = [];
+
+    
+    socket.on("connect", () => console.log(" Connected"));
+
+    
+    socket.on("market_update", (data) => {
+      masterData = data;
+      document.getElementById("total-count").innerText = masterData.length;
+      renderList(displayedData.length === 0 ? masterData : displayedData);
+    });
+
+    function renderList(data) {
+      displayedData = data;
+      document.getElementById("display-count").innerText = data.length;
+      
+      const container = document.getElementById("list-container");
+      container.innerHTML = "";
+
+      data.forEach(t => {
+        const div = document.createElement("div");
+        div.className = "token-item";
+        div.innerHTML = `
+          <strong>${t.name}</strong> (${t.symbol}) <br>
+          $${t.price}
+        `;
+        
+        div.onclick = () => inspectToken(t); 
+        container.appendChild(div);
+      });
+    }
+
+    
+    function inspectToken(token) {
+      const inspector = document.getElementById("inspector");
+      
+      inspector.innerHTML = JSON.stringify(token, null, 2); 
+    }
+
+    
+
+    function sortPriceDesc() {
+    
+      const sorted = [...masterData].sort((a, b) => b.price - a.price);
+      renderList(sorted);
+    }
+
+    function sortPriceAsc() {
+      
+      const sorted = [...masterData].sort((a, b) => a.price - b.price);
+      renderList(sorted);
+    }
+
+    function filterTop5() {
+      const top5 = masterData.slice(0, 5);
+      renderList(top5);
+    }
+
+    function resetView() {
+      renderList(masterData);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Meme Coin Aggregator (Pro)</title>
+  <style>
+    body { font-family: 'Courier New', monospace; background: #0d1117; color: #c9d1d9; padding: 20px; }
+    h2 { border-bottom: 1px solid #30363d; padding-bottom: 10px; color: #58a6ff; }
+    .status { margin-bottom: 20px; font-size: 0.9em; }
+    
+    
+    .controls { background: #161b22; border: 1px solid #30363d; padding: 15px; margin-bottom: 20px; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; }
+    
+    button, select { 
+      background: #21262d; color: #c9d1d9; border: 1px solid #30363d; 
+      padding: 6px 12px; cursor: pointer; border-radius: 4px; font-family: inherit;
+    }
+    button:hover, select:hover { background: #30363d; border-color: #8b949e; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .label { color: #8b949e; font-size: 0.85em; margin-right: 5px; }
+
+    
+    .token-item { 
+      background: #161b22; padding: 15px; margin-bottom: 8px; 
+      border: 1px solid #30363d; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .token-info { display: flex; flex-direction: column; }
+    .token-name { font-weight: bold; color: #58a6ff; font-size: 1.1em; }
+    .token-meta { font-size: 0.85em; color: #8b949e; margin-top: 4px; }
+    
+    .token-stats { text-align: right; }
+    .price { font-size: 1.1em; color: #fff; }
+    .positive { color: #3fb950; }
+    .negative { color: #f85149; }
+
+    
+    .pagination { margin-top: 20px; display: flex; justify-content: center; gap: 10px; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <h2> Real Time Data Aggregation Service</h2>
+  <div id="status" class="status">Connecting to WebSocket...</div>
+
+  <div class="controls">
+    
+    <div>
+      <span class="label">Sort By:</span>
+      <select id="sortMetric" onchange="updateSort()">
+        <option value="price">Price ($)</option>
+        <option value="volume">Volume</option>
+        <option value="marketCap">Market Cap</option>
+      </select>
+      
+      <select id="sortDir" onchange="updateSort()">
+        <option value="desc">Desc ⬇</option>
+        <option value="asc">Asc ⬆</option>
+      </select>
+    </div>
+
+    <div style="margin-left: auto;">
+      <span class="label">Performance Period:</span>
+      <select id="timeFilter" onchange="updateTimeFilter()">
+        <option value="1h">1 Hour</option>
+        <option value="24h">24 Hours</option>
+        <option value="7d">7 Days</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="market-data">Waiting for data stream...</div>
+
+  <div class="pagination" id="paginationControls" style="display:none;">
+    <button id="btnPrev" onclick="changePage(-1)">Previous</button>
+    <span id="pageIndicator" style="color: #8b949e;">Page 1</span>
+    <button id="btnNext" onclick="changePage(1)">Next</button>
+  </div>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script>
+    const socket = io("http://localhost:3000");
+    const statusDiv = document.getElementById("status");
+    const dataDiv = document.getElementById("market-data");
+    const pageIndicator = document.getElementById("pageIndicator");
+    const btnPrev = document.getElementById("btnPrev");
+    const btnNext = document.getElementById("btnNext");
+    const paginationControls = document.getElementById("paginationControls");
+
+    
+    let masterData = []; 
+    let filteredData = []; 
+    
+    let state = {
+      timePeriod: '1h',     
+      sortBy: 'price',      
+      sortDir: 'desc',     
+      page: 1,
+      limit: 10             
+    };
+
+    
+    socket.on("connect", () => {
+      statusDiv.innerHTML = " Connected to Live Feed";
+      statusDiv.style.color = "#3fb950";
+    });
+
+    socket.on("disconnect", () => {
+      statusDiv.innerHTML = " Connection Lost";
+      statusDiv.style.color = "#f85149";
+    });
+
+    socket.on("market_update", (tokens) => {
+      console.log(` Received ${tokens.length} tokens`);
+      masterData = tokens;
+      applyLogic(); 
+    });
+
+    
+    function applyLogic() {
+      
+      let result = [...masterData];
+
+    
+      result.sort((a, b) => {
+        let valA, valB;
+
+        switch(state.sortBy) {
+          case 'price': 
+            valA = a.price; valB = b.price; 
+            break;
+          case 'volume': 
+            
+            valA = a.volume24h || 0; valB = b.volume24h || 0; 
+            break;
+          case 'marketCap': 
+            valA = a.marketCap || 0; valB = b.marketCap || 0; 
+            break;
+          default: valA = 0; valB = 0;
+        }
+
+        return state.sortDir === 'asc' ? valA - valB : valB - valA;
+      });
+
+      filteredData = result;
+      renderPage();
+    }
+
+    
+    function renderPage() {
+      const totalPages = Math.ceil(filteredData.length / state.limit);
+      
+      if (state.page > totalPages) state.page = totalPages || 1;
+      if (state.page < 1) state.page = 1;
+
+      const startIndex = (state.page - 1) * state.limit;
+      const endIndex = startIndex + state.limit;
+      const pageData = filteredData.slice(startIndex, endIndex);
+
+      if(pageData.length === 0) {
+        dataDiv.innerHTML = "<div style='padding:20px; color:#8b949e'>No tokens match criteria.</div>";
+        paginationControls.style.display = 'none';
+        return;
+      }
+
+      let html = `<div style="margin-bottom:10px; color:#8b949e; font-size:0.8em">
+        Displaying ${startIndex + 1}-${Math.min(endIndex, filteredData.length)} of ${filteredData.length} tokens
+      </div>`;
+
+      pageData.forEach(t => {
+        
+        let displayChange = 0;
+        let periodLabel = "1h";
+
+        if (state.timePeriod === '1h') {
+          displayChange = t.priceChange1h || 0;
+          periodLabel = "1h";
+        } else if (state.timePeriod === '24h') {
+          
+          displayChange = t.priceChange24h || (t.priceChange1h || 0); 
+          periodLabel = "24h";
+        } else if (state.timePeriod === '7d') {
+          displayChange = t.priceChange7d || (t.priceChange1h || 0);
+          periodLabel = "7d";
+        }
+
+        const changeClass = displayChange >= 0 ? 'positive' : 'negative';
+        const sign = displayChange >= 0 ? '+' : '';
+        const mktCap = t.marketCap ? '$' + t.marketCap.toLocaleString() : 'N/A';
+        const vol = t.volume24h ? '$' + t.volume24h.toLocaleString() : 'N/A';
+
+        html += `
+          <div class="token-item">
+            <div class="token-info">
+              <span class="token-name">${t.name} <span style="color:#8b949e; font-weight:normal">(${t.symbol})</span></span>
+              <span class="token-meta">
+                Protocol: ${t.protocol || 'Unknown'} <br>
+                Address: ${t.address.slice(0,6)}...${t.address.slice(-4)}
+              </span>
+            </div>
+            
+            <div class="token-stats">
+              <div class="price">$${t.price.toFixed(8)}</div>
+              <div class="${changeClass}">${sign}${displayChange.toFixed(2)}% (${periodLabel})</div>
+              <div class="token-meta">
+                 Vol: ${vol} <br>
+                 MC: ${mktCap}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      dataDiv.innerHTML = html;
+
+    
+      if (filteredData.length > state.limit) {
+        paginationControls.style.display = 'flex';
+        pageIndicator.innerText = `Page ${state.page} of ${totalPages}`;
+        btnPrev.disabled = state.page === 1;
+        btnNext.disabled = state.page === totalPages;
+      } else {
+        paginationControls.style.display = 'none';
+      }
+    }
+
+    
+
+    function updateSort() {
+      state.sortBy = document.getElementById('sortMetric').value;
+      state.sortDir = document.getElementById('sortDir').value;
+      state.page = 1; 
+      applyLogic();
+    }
+
+    function updateTimeFilter() {
+      state.timePeriod = document.getElementById('timeFilter').value;
+      
+      renderPage(); 
+    }
+
+    function changePage(delta) {
+      state.page += delta;
+      renderPage();
+    }
+  </script>
+</body>
+</html>
