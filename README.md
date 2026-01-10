@@ -32,8 +32,9 @@ I designed this to be "zero-latency" for the client—all the heavy lifting (fil
     ```
 
 2.  **Start Redis (if using Docker)**
+    ```bash
     docker run --name my-redis -p 6379:6379 -d redis
-
+    ```
 
 3.  **Start the Server**
     ```bash
