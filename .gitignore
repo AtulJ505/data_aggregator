@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+build/
+dist/
+
+# Environment variables (NEVER commit these)
+.env
+.env.test
+.env.production
+
+# Misc
+.DS_Store
+.vscode/
+*.log
+npm-debug.log*
