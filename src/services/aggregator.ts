@@ -20,7 +20,7 @@ export const runAggregation = async (): Promise<UnifiedToken[]> => {
       const freshPrice = geckoPrices[t.address];
       
       
-      if (freshPrice) {
+      if (typeof freshPrice === 'number' && Number.isFinite(freshPrice) && freshPrice >= 0) {
         return { 
           ...t, 
           price: freshPrice, 

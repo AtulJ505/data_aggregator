@@ -1,11 +1,12 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { Server } from 'socket.io';
+import 'dotenv/config';
 import Redis from 'ioredis';
 import { runAggregation } from './services/aggregator';
 
 const fastify = Fastify({ logger: true });
-const redis = new Redis(); 
+const redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379');
 
 
 fastify.register(cors, { 
@@ -56,8 +57,8 @@ setInterval(async () => {
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000, host: '0.0.0.0' });
-    console.log(' Server running on http://localhost:3000');
+    await fastify.listen({ port: Number(process.env.PORT || 3000), host: '0.0.0.0' });
+    fastify.log.info(`Server listening on port ${process.env.PORT || 3000}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
