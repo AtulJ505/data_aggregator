@@ -51,7 +51,9 @@ npm run build
 npm start
 ```
 
-The production build writes `dist/server.js`, which `npm start` runs. Unit tests mock upstream HTTP calls and require neither Redis nor paid API credentials. Coverage is measured by Jest; the suite does not yet exercise a live Redis server or complete Socket.IO sessions. CI checks types, tests and the production build on Node.js 22 and 24.
+The production build writes `dist/server.js`, which `npm start` runs. Unit tests mock upstream HTTP calls and require neither Redis nor paid API credentials. Coverage is measured by Jest. CI also starts a disposable Redis service and smoke-tests `npm start`, an empty cache, and a Redis-backed REST response on Node.js 22 and 24. Full Socket.IO sessions and live upstream responses are not covered by these checks.
+
+To run the production smoke test locally, build first and point `REDIS_URL` at a **disposable test database**, for example `REDIS_URL=redis://127.0.0.1:6379/15 npm run test:smoke`. The smoke test clears its cache key.
 
 ## Architecture
 
