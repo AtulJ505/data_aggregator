@@ -14,7 +14,10 @@ export const fetchGeckoTerminalPrices = async (addresses: string[]): Promise<Rec
 
     for (const [addr, priceStr] of Object.entries(rawPrices)) {
       
-      cleanPrices[addr] = parseFloat(priceStr as string);
+      if (typeof priceStr !== 'string' && typeof priceStr !== 'number') continue;
+      if (typeof priceStr === 'string' && priceStr.trim() === '') continue;
+      const price = Number(priceStr);
+      if (Number.isFinite(price) && price >= 0) cleanPrices[addr] = price;
     }
 
     return cleanPrices;
